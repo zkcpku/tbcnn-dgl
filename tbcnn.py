@@ -36,6 +36,9 @@ class TBCNNCell(torch.nn.Module):
                 W_children.append((i/(child_nums-1))*self.W_right+((child_nums-1-i)/(child_nums-1))*self.W_left)
             W_s=torch.stack(W_children,dim=0)
             child_h=nodes.mailbox['h'].unsqueeze(-2) #size(batch, child_nums, 1, x_size)
+            # import pdb;pdb.set_trace()
+            # print(child_h.shape)
+            # print(W_s.shape)
             children_state=torch.matmul(child_h,W_s)
             children_state=children_state.squeeze(-2)
             children_state=children_state.sum(dim=1)
@@ -58,17 +61,21 @@ class TBCNNClassifier(torch.nn.Module):
         self.dropout = torch.nn.Dropout(dropout)
         self.cell = TBCNNCell(x_size, h_size)
         self.num_layers = num_layers
-        self.embeddings=nn.Embedding(vocab_size,x_size)
+
+        self.type_embeddings = nn.Embedding(vocab_size[0], int(x_size/2))
+        self.token_embedding = nn.Embedding(vocab_size[1], x_size - int(x_size/2))
+
         self.classifier=nn.Linear(h_size,n_classes)
         self.pooling=GlobalAttentionPooling(nn.Linear(h_size,1))
         #self.pooling=AvgPooling()
 
     def forward(self, batch,root_ids=None):
-        batch.ndata['h']=self.embeddings(batch.ndata['type'])
+        batch.ndata['h']=torch.cat([self.type_embeddings(batch.ndata['type']),self.token_embedding(batch.ndata['token'])],dim=-1)
         for i in range(self.num_layers):
             batch.update_all(message_func=self.cell.message_func,
                             reduce_func=self.cell.reduce_func,
                             apply_node_func=self.cell.apply_node_func)
         batch_pred=self.pooling(batch,batch.ndata['h'])
-        batch_pred=self.classifier(batch_pred)
-        return batch_pred
+        batch_logit=self.classifier(batch_pred)
+        batch_softlogit = torch.softmax(batch_logit, dim=-1)
+        return batch_softlogit, batch_logit
