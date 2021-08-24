@@ -2,12 +2,12 @@ class myConfig():
     def __init__(self) -> None:
         self.device = 'cuda'
         self.seed = 36
-        self.batch_size = 16
+        self.batch_size = 64
         self.num_workers = 8
 
-        self.model = {'x_size':128, 'h_size':128, 'dropout':0.3, 'num_layers':2}
+        self.model = {'x_size':128, 'h_size':128, 'dropout':0.3, 'num_layers':1}
         
-        self.task_name = 'python'
+        self.task_name = 'java'
         if self.task_name == 'java':
             # java token_vocabsize, type_vocabsize = (115, 107)
             self.task = {'vocab_size': (107,115), 'num_classes': 250, 'task': 'java250'}
@@ -31,7 +31,7 @@ class myConfig():
                 'save': '/home/zhangkechi/workspace/dgl_tbcnn/save/Project_CodeNet_Python800_spts'}
         
 
-        self.optim = {'weight_decay': 1e-5, 'lr': 0.0001, 'adam_epsilon':1e-8,'max_grad_norm': 1.0}
+        self.optim = {'weight_decay': 1e-5, 'lr': 0.001, 'adam_epsilon':1e-8,'max_grad_norm': 1.0}
         self.num_epochs = 50
 
         

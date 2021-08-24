@@ -80,12 +80,12 @@ def train_iter(dataloader, model, criterion, optimizer, scheduler, epoch):
         softlogit, logits = model(inputs)
         loss = criterion(logits, labels)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(
-            model.parameters(), my_config.optim['max_grad_norm'])
+        # torch.nn.utils.clip_grad_norm_(
+        #     model.parameters(), my_config.optim['max_grad_norm'])
 
         optimizer.step()
         optimizer.zero_grad()
-        scheduler.step()
+        # scheduler.step()
         running_loss += loss.item()
         bar.set_description("epoch {} loss {}".format(epoch, loss.item()))
 
@@ -94,13 +94,14 @@ def train_iter(dataloader, model, criterion, optimizer, scheduler, epoch):
 
 def test_iter(dataloader, model, criterion, epoch):
     model.eval()
+    print("start testing...")
     with torch.no_grad():
-        bar = tqdm(total=len(dataloader))
+        # bar = tqdm(total=len(dataloader))
         running_loss = 0.0
         all_labels = []
         all_preds = []
         for g, labels in dataloader:
-            bar.update(1)
+            # bar.update(1)
             inputs, labels = g, labels
             inputs, labels = inputs.to(
                 my_config.device), labels.to(my_config.device)
@@ -153,15 +154,17 @@ def main():
 
     max_steps = my_config.num_epochs * \
         len(train_dataloader) // my_config.data['batch_size']
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=max_steps*0.1,
-                                                num_training_steps=max_steps)
+    # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=max_steps*0.1,
+    #                                             num_training_steps=max_steps)
+
+    scheduler = None
 
     checkpoint_last = os.path.join(
         my_config.path['save'], 'checkpoint-last')
-    scheduler_last = os.path.join(checkpoint_last, 'scheduler.pt')
+    # scheduler_last = os.path.join(checkpoint_last, 'scheduler.pt')
     optimizer_last = os.path.join(checkpoint_last, 'optimizer.pt')
-    if os.path.exists(scheduler_last):
-        scheduler.load_state_dict(torch.load(scheduler_last))
+    # if os.path.exists(scheduler_last):
+    #     scheduler.load_state_dict(torch.load(scheduler_last))
     if os.path.exists(optimizer_last):
         optimizer.load_state_dict(torch.load(optimizer_last))
 
@@ -171,6 +174,7 @@ def main():
     criterion = nn.CrossEntropyLoss()
 
     # loop over the dataset multiple times
+    max_acc = 0
     csv_log = open(my_config.path['save'] + '/acc.log', "w")
     csv_log.write('Epoch,Accuracy,Loss,\n')
     for epoch in range(my_config.num_epochs):
@@ -185,6 +189,9 @@ def main():
         acc, loss = test_iter(test_dataloader, model, criterion, epoch)
         csv_log.write(str(epoch)+','+str(acc)+','+str(loss)+'\n')
         torch.cuda.empty_cache()
+        if acc > max_acc:
+            max_acc = acc
+            torch.save(model.state_dict(), my_config.path['save'] + '/model.pt')
     print('Finished Training')
     csv_log.close()
 
