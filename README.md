@@ -4,4 +4,7 @@ An implementation of TBCNN [Mou et al. 2016]: https://arxiv.org/abs/1409.5718 wi
 
 
 
-- try to add support for CodeNet dataset, but there are still some bugs can't be found
+- add support for CodeNet dataset
+  - `python preprocess.py` to generate dataset
+  - edit `config.py`
+  - `python main.py`

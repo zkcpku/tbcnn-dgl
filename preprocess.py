@@ -22,7 +22,7 @@ c1000path = '/home/zhangkechi/workspace/data/codenet/Project_CodeNet_C++1000_spt
 c1400path = '/home/zhangkechi/workspace/data/codenet/Project_CodeNet_C++1400_spts/'
 javapath = '/home/zhangkechi/workspace/data/codenet/Project_CodeNet_Java250_spts/'
 
-datapath = c1000path
+datapath = c1400path
 edgepath = datapath+'edge.csv'
 labelpath = datapath+'graph-label.csv'
 nodepath = datapath+'node-feat.csv'
@@ -357,5 +357,5 @@ def dataset_convert(dataset):
 
 if __name__ == '__main__':
     print(datapath)
-    save_path = '/home/zhangkechi/workspace/dgl_tbcnn/data/Project_CodeNet_C++1000_spts/'
+    save_path = '/home/zhangkechi/workspace/dgl_tbcnn/data/Project_CodeNet_C++1400_spts/'
     save_dataset(save_path)

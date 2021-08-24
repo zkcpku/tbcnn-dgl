@@ -159,6 +159,10 @@ def main():
 
     scheduler = None
 
+    if os.path.exists(my_config.path['save'] + '/model.pt'):
+        print("loading existing model...")
+        model.load_state_dict(torch.load(my_config.path['save'] + '/model.pt'))    
+
     checkpoint_last = os.path.join(
         my_config.path['save'], 'checkpoint-last')
     # scheduler_last = os.path.join(checkpoint_last, 'scheduler.pt')
