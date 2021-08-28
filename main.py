@@ -125,8 +125,14 @@ def test_iter(dataloader, model, criterion, epoch):
 
 def main():
     set_seed(my_config.seed)
-
-    model = TBCNNClassifier(my_config.model['x_size'],my_config.model['h_size'], my_config.model['dropout'], my_config.task['num_classes'], my_config.task['vocab_size'], my_config.model['num_layers'])
+    if my_config.model['name'] == 'tbcnn':
+        model = TBCNNClassifier(my_config.model['x_size'],my_config.model['h_size'], my_config.model['dropout'], my_config.task['num_classes'], my_config.task['vocab_size'], my_config.model['num_layers'])
+    elif my_config.model['name'] == 'treecaps':
+        model = TreeCapsClassifier(my_config.model['x_size'], my_config.model['h_size'], my_config.model['dropout'],
+                                   my_config.task['num_classes'], my_config.task['vocab_size'], my_config.model['num_layers'])
+    else:
+        raise NotImplementedError
+        
     model.to(my_config.device)
 
     train_dataset = CodeNetDataset(my_config.data['train_path'])

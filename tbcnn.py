@@ -17,7 +17,7 @@ def squash(x, dim=-1):
 
 
 class TreeCapsClassifier(nn.Module):
-    def __init__(self, x_size, h_size, dropout, n_classes, vocab_size, num_layers=4, a=my_config.model['a'], b=my_config.model['b'], routing_iter=3, device=torch.device('cuda')):
+    def __init__(self, x_size, h_size, dropout, n_classes, vocab_size, num_layers=4, a=my_config.model['a'], b=my_config.model['b'], routing_iter=my_config.model['routing_iter'], device=torch.device('cuda')):
         super(TreeCapsClassifier, self).__init__()
         type_vocabsize, token_vocabsize = vocab_size
         self.x_size = x_size
@@ -30,16 +30,16 @@ class TreeCapsClassifier(nn.Module):
         # self.classifier = nn.Linear(h_size, n_classes)
         self.pooling = GlobalAttentionPooling(nn.Linear(h_size, 1))
 
-
+        self.Dcc = my_config.model['Dcc']
         self.a = a
         self.b = b
-        self.N_sc = 100
-        self.d_sc = 16
-        self.d_cc = 16
+        # self.N_sc = 100
+        # self.d_sc = 16
+        # self.d_cc = 16
         self.routing_iter = routing_iter
         self.device = device
         self.n_classes = n_classes
-        self.Dcc = 16
+        
         self.Wjm = nn.Parameter(torch.Tensor(self.a, self.num_layers, self.Dcc))
         self.Wjm.data.uniform_(-0.1, 0.1)
 

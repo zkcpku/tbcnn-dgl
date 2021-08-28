@@ -5,9 +5,11 @@ class myConfig():
         self.batch_size = 256
         self.num_workers = 8
 
-        self.model = {'x_size':256, 'h_size':256, 'dropout':0.3, 'num_layers':4}
+        self.model = {'x_size': 256, 'h_size': 256, 'dropout': 0.3, 'num_layers': 4, 'a': 20, 'b': 25, 'routing_iter': 3, 'Dcc': 16}
+        # self.model['name'] = 'tbcnn'
+        self.model['name'] = 'treecaps'
         
-        self.task_name = 'c1000'
+        self.task_name = 'java'
         if self.task_name == 'java':
             # java token_vocabsize, type_vocabsize = (115, 107)
             self.task = {'vocab_size': (107,115), 'num_classes': 250, 'task': 'java250'}
@@ -42,7 +44,7 @@ class myConfig():
                 'save': '/home/zhangkechi/workspace/dgl_tbcnn/save/Project_CodeNet_C++1000_spts'}
         elif self.task_name == 'c1400':
             # c++ 1400
-            # TODO: {'token_vocabsize': ??, 'type_vocabsize': ??}
+            # {'token_vocabsize': 156, 'type_vocabsize': 190}
             self.task = {'vocab_size': (190, 156), 'num_classes': 1400, 'task': 'c++1000'}
             self.data = {'train_path': '/home/zhangkechi/workspace/dgl_tbcnn/data/Project_CodeNet_C++1400_spts/train.pkl',
                          'test_path': '/home/zhangkechi/workspace/dgl_tbcnn/data/Project_CodeNet_C++1400_spts/test.pkl',
