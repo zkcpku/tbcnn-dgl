@@ -40,7 +40,7 @@ class TreeCapsClassifier(nn.Module):
         self.device = device
         self.n_classes = n_classes
         
-        self.Wjm = nn.Parameter(torch.Tensor(self.a, self.num_layers, self.Dcc))
+        self.Wjm = nn.Parameter(torch.Tensor(self.a, self.num_layers, self.Dcc * self.n_classes))
         self.Wjm.data.uniform_(-0.1, 0.1)
 
     def forward(self, batch, root_ids=None):
@@ -105,12 +105,15 @@ class TreeCapsClassifier(nn.Module):
         out_SC = torch.stack(out_SC, dim=0)
         # size: batch_size * a * m
         # print(out_SC.size())
+        # print(out_SC.shape)
         
         out_CC = self.dynamic_routing(out_SC)
+        out_CC_l2 = (out_CC ** 2).sum(dim=-1, keepdim=False).sqrt()
+        
 
         # print(out_CC.size())
         # print(out_CC[0])
-        batch_logit = out_CC
+        batch_logit = out_CC_l2
         batch_soft_logit = torch.softmax(batch_logit, dim=-1)
         return batch_logit, batch_soft_logit
 
@@ -151,7 +154,8 @@ class TreeCapsClassifier(nn.Module):
         # batch_size * a * m
         # print(self.Wjm.shape)
         # print(input.shape)
-        v_m_j = torch.einsum('anc,ban->bc', self.Wjm, input)
+        v_m_j = torch.einsum('amc,bam->bac', self.Wjm, input)
+        v_m_j = v_m_j.reshape(v_m_j.shape[0], self.a, self.n_classes, self.Dcc)
         # batch_Size * Dcc
         # v_m_j = torch.matmul(input, self.Wjm)
         # print(v_m_j.shape)
@@ -165,17 +169,19 @@ class TreeCapsClassifier(nn.Module):
             # print(v_m_j.shape)
             # bs * a
             if rout == self.routing_iter -1:
-                s_J = torch.einsum('ban,ba->bn',gamma_IJ, v_m_j)
+                s_J = torch.einsum('ban,banc->bnc',gamma_IJ, v_m_j)
                 z_m = squash(s_J)
             else:
-                s_J = torch.einsum('ban,ba->bn',gamma_IJ, v_m_j_stopped)
+                # print(gamma_IJ.shape)
+                # print(v_m_j_stopped.shape)
+                s_J = torch.einsum('ban,banc->bnc',gamma_IJ, v_m_j_stopped)
                 z_m = squash(s_J)
                 # print("debug")
                 # print(z_m.shape)
                 # batch_size * n_classes
                 # print(v_m_j_stopped.shape)
                 # batch_size * a
-                delta_IJ += torch.einsum('ba,bn->ban', v_m_j_stopped, z_m)
+                delta_IJ += torch.einsum('banc,bnc->ban', v_m_j_stopped, z_m)
                 # b * a * n_classes
         return z_m
         
@@ -317,5 +323,7 @@ if __name__ == '__main__':
     # print(model)
     t = model(all_data['inputs'])
     print(t)
+    print(t[0].shape)
+    print(t[1].shape)
 
 
