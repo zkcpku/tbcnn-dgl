@@ -6,6 +6,182 @@ from dgl.nn import GlobalAttentionPooling, MaxPooling, AvgPooling
 import math
 from copy import deepcopy
 from random import randint, choice
+import sys
+from config import myConfig, my_config
+
+
+def squash(x, dim=-1):
+    squared_norm = (x ** 2).sum(dim=dim, keepdim=True)
+    scale = squared_norm / (1 + squared_norm)
+    return scale * x / (squared_norm.sqrt() + 1e-8)
+
+
+class TreeCapsClassifier(nn.Module):
+    def __init__(self, x_size, h_size, dropout, n_classes, vocab_size, num_layers=4, a=my_config.model['a'], b=my_config.model['b'], routing_iter=3, device=torch.device('cuda')):
+        super(TreeCapsClassifier, self).__init__()
+        type_vocabsize, token_vocabsize = vocab_size
+        self.x_size = x_size
+        self.dropout = torch.nn.Dropout(dropout)
+        self.layers = nn.ModuleList(TBCNNCell(x_size, h_size)
+                                    for _ in range(num_layers))
+        self.num_layers = num_layers
+        self.token_embeddings = nn.Embedding(token_vocabsize, x_size//2)
+        self.type_embeddings = nn.Embedding(type_vocabsize, x_size//2)
+        # self.classifier = nn.Linear(h_size, n_classes)
+        self.pooling = GlobalAttentionPooling(nn.Linear(h_size, 1))
+
+
+        self.a = a
+        self.b = b
+        self.N_sc = 100
+        self.d_sc = 16
+        self.d_cc = 16
+        self.routing_iter = routing_iter
+        self.device = device
+        self.n_classes = n_classes
+        self.Dcc = 16
+        self.Wjm = nn.Parameter(torch.Tensor(self.a, self.num_layers, self.Dcc))
+        self.Wjm.data.uniform_(-0.1, 0.1)
+
+    def forward(self, batch, root_ids=None):
+        batch.ndata['h'] = torch.cat([self.type_embeddings(
+            batch.ndata['type']), self.token_embeddings(batch.ndata['token'])], dim=1)
+        #tbcnn encoding
+        layer_feats = []
+        for i in range(self.num_layers):
+            batch.update_all(message_func=self.layers[i].message_func,
+                             reduce_func=self.layers[i].reduce_func,
+                             apply_node_func=self.layers[i].apply_node_func)
+            layer_feat = batch.ndata['h']
+            layer_feats.append(layer_feat)
+        # print(batch.ndata['h'].size())  # torch.Size([2465, 256])
+        
+        # size: batch_nodes, x_size, num_layers
+        layer_feats = torch.stack(layer_feats, dim=-1)
+        # print(layer_feats.size())  # torch.Size([2465, 256, 1])
+
+        #primary variable capsules
+        numnodes = batch.batch_num_nodes()
+        numnodes_feats = numnodes*self.x_size
+        numnodes_feats = numnodes_feats.tolist()
+        # tensor([236, 163, 181, 438, 769, 203, 205, 270], device='cuda:0') [60416, 41728, 46336, 112128, 196864, 51968, 52480, 69120]
+        # print(numnodes, numnodes_feats)
+        all_capsules = layer_feats.view(-1, self.num_layers)
+        # print(all_capsules.size())  # torch.Size([631040, 1])
+        # size: batch_nodes * x_size, num_layers
+        primary_capsules = squash(all_capsules)
+        # print(primary_capsules.size())  # torch.Size([631040, 1]) 
+        # Npvc * Dpvc
+        # Dpvc = num_layers of tbcnn
+        # Npvc = node_num * embedding_size
+
+        #graphs_feat=layer_feats.split(numnodes)
+
+        #secondary capsule: Variable-to-Static Routing
+        # only used for sorting, sqrt() can be omitted
+        capsule_l2norms = (primary_capsules ** 2).sum(dim=1,
+                                                      keepdim=False).sqrt()
+        # print(capsule_l2norms.size())
+        each_pvc = primary_capsules.split(numnodes_feats) 
+        u = each_pvc
+        # print(len(u)) # batch_size = 8
+        out_SC = []
+        for uu in u:
+            # for each tree-capsule in batch
+            SC = self.vts_routing(uu)
+            out_SC.append(SC)
+            # uu_l2 = (uu ** 2).sum(dim=1, keepdim=False).sqrt()
+            # print(uu_l2.size())
+            # uu_l2_topk_loc = uu_l2.topk(self.a, dim=-1)[1]
+            # print(uu_l2_topk_loc)
+            # print(uu.shape)
+            # # init_uu = uu.gather(dim=0, index=uu_l2_topk_loc.view(-1, 1)) # how to use gather???
+            
+            # # init the output of SC
+            # vj = uu[uu_l2_topk_loc]
+            # print(vj.shape)
+            # # print(vj)
+            # alpha = torch.zero(self.a, self.b)
+        out_SC = torch.stack(out_SC, dim=0)
+        # size: batch_size * a * m
+        # print(out_SC.size())
+        
+        out_CC = self.dynamic_routing(out_SC)
+
+        # print(out_CC.size())
+        # print(out_CC[0])
+        batch_logit = out_CC
+        batch_soft_logit = torch.softmax(batch_logit, dim=-1)
+        return batch_logit, batch_soft_logit
+
+
+
+    def vts_routing(self, input):
+        alpha_IJ = torch.zeros(self.b, self.a).to(self.device)
+        input_l2 = (input ** 2).sum(dim=1, keepdim=False).sqrt()
+        input_l2_topb_loc = input_l2.topk(self.b, dim=-1)[1]
+        u_i = input[input_l2_topb_loc]
+        u_i = u_i.detach() # ????
+
+        input_l2_topa_loc = input_l2.topk(self.a, dim=-1)[1]
+        v_j = input[input_l2_topa_loc]
+        # print(u_i.shape)
+        # print(v_j.shape)
+        for rout in range(self.routing_iter):
+            u_produce_v = torch.matmul(u_i, v_j.transpose(0,1))
+
+            # print(u_produce_v.size())
+            alpha_IJ += u_produce_v
+            beta_IJ = torch.softmax(alpha_IJ, dim=-1)
+            # print("beta")
+            # print(beta_IJ.shape) # b*a
+            v_j = torch.matmul(beta_IJ.transpose(0,1), u_i)
+
+
+        
+        v_j = squash(v_j)
+        # print(v_j.shape)
+        # print(v_j)
+        return v_j
+
+    def dynamic_routing(self, input):
+        # print("debug")
+        # print(input.shape)
+        # print(input)
+        # batch_size * a * m
+        # print(self.Wjm.shape)
+        # print(input.shape)
+        v_m_j = torch.einsum('anc,ban->bc', self.Wjm, input)
+        # batch_Size * Dcc
+        # v_m_j = torch.matmul(input, self.Wjm)
+        # print(v_m_j.shape)
+        v_m_j_stopped = v_m_j.detach()
+        
+        delta_IJ = torch.zeros(input.shape[0],self.a, self.n_classes).to(self.device)
+        for rout in range(self.routing_iter):
+            gamma_IJ = torch.softmax(delta_IJ, dim=-1)
+            # print(gamma_IJ.shape)
+            # bs * a * n_classes
+            # print(v_m_j.shape)
+            # bs * a
+            if rout == self.routing_iter -1:
+                s_J = torch.einsum('ban,ba->bn',gamma_IJ, v_m_j)
+                z_m = squash(s_J)
+            else:
+                s_J = torch.einsum('ban,ba->bn',gamma_IJ, v_m_j_stopped)
+                z_m = squash(s_J)
+                # print("debug")
+                # print(z_m.shape)
+                # batch_size * n_classes
+                # print(v_m_j_stopped.shape)
+                # batch_size * a
+                delta_IJ += torch.einsum('ba,bn->ban', v_m_j_stopped, z_m)
+                # b * a * n_classes
+        return z_m
+        
+
+
+
 
 class TBCNNCell(torch.nn.Module):
     def __init__(self, x_size, h_size):
@@ -109,3 +285,37 @@ class TBCNNClassifier(torch.nn.Module):
         batch_logit=self.classifier(batch_pred)
         batch_softlogit = torch.softmax(batch_logit, dim=-1)
         return batch_softlogit, batch_logit
+
+def save_test_data():
+    from config import my_config
+    from main import CodeNetDataset
+    print("start saving test data...")
+    batch_size = 8
+    train_dataset = CodeNetDataset(my_config.data['train_path'])
+    train_dataloader = dgl.dataloading.pytorch.GraphDataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=my_config.data['num_workers'])
+    
+    for g, labels in train_dataloader:
+        inputs, labels = g, labels
+        inputs, labels = inputs.to(
+            my_config.device), labels.to(my_config.device)
+        print(inputs)
+        torch.save({'inputs': inputs, 'labels': labels},
+                   '/home/zhangkechi/workspace/dgl_tbcnn_edit/for_test.pkl')
+        break
+
+if __name__ == '__main__':
+    from config import my_config
+    all_data = torch.load('/home/zhangkechi/workspace/dgl_tbcnn_edit/for_test.pkl')
+    # print(all_data['inputs'])
+    # print(all_data['labels'])
+
+    model = TreeCapsClassifier(my_config.model['x_size'], my_config.model['h_size'], my_config.model['dropout'],
+                            my_config.task['num_classes'], my_config.task['vocab_size'], my_config.model['num_layers'])
+
+    model.cuda()
+    # print(model)
+    t = model(all_data['inputs'])
+    print(t)
+
+
