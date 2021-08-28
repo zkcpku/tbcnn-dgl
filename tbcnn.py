@@ -12,8 +12,9 @@ from config import myConfig, my_config
 
 def squash(x, dim=-1):
     squared_norm = (x ** 2).sum(dim=dim, keepdim=True)
-    scale = squared_norm / (1 + squared_norm)
-    return scale * x / (squared_norm.sqrt() + 1e-8)
+    scale = squared_norm / (1 + squared_norm) / (squared_norm.sqrt() + 1e-8)
+    out = scale * x
+    return out 
 
 
 class TreeCapsClassifier(nn.Module):
@@ -115,7 +116,7 @@ class TreeCapsClassifier(nn.Module):
         # print(out_CC[0])
         batch_logit = out_CC_l2
         batch_soft_logit = torch.softmax(batch_logit, dim=-1)
-        return batch_logit, batch_soft_logit
+        return batch_logit, batch_logit
 
 
 
@@ -134,7 +135,7 @@ class TreeCapsClassifier(nn.Module):
             u_produce_v = torch.matmul(u_i, v_j.transpose(0,1))
 
             # print(u_produce_v.size())
-            alpha_IJ += u_produce_v
+            alpha_IJ = u_produce_v + alpha_IJ
             beta_IJ = torch.softmax(alpha_IJ, dim=-1)
             # print("beta")
             # print(beta_IJ.shape) # b*a

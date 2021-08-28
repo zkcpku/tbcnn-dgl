@@ -132,9 +132,9 @@ def main():
                                    my_config.task['num_classes'], my_config.task['vocab_size'], my_config.model['num_layers'])
     else:
         raise NotImplementedError
-        
-    model.to(my_config.device)
 
+    model.to(my_config.device)
+    
     train_dataset = CodeNetDataset(my_config.data['train_path'])
     train_dataloader = dgl.dataloading.pytorch.GraphDataLoader(
         train_dataset, batch_size=my_config.data['batch_size'], shuffle=True, num_workers=my_config.data['num_workers'])
@@ -181,12 +181,14 @@ def main():
     
     # model.train()
     model.zero_grad()
-    criterion = nn.CrossEntropyLoss()
+    # criterion = nn.CrossEntropyLoss()
+    criterion = nn.MultiMarginLoss()
 
     # loop over the dataset multiple times
     max_acc = 0
     csv_log = open(my_config.path['save'] + '/acc.log', "w")
     csv_log.write('Epoch,Accuracy,Loss,\n')
+    # torch.autograd.set_detect_anomaly(True)
     for epoch in range(my_config.num_epochs):
         train_iter(train_dataloader, model, criterion, optimizer, scheduler, epoch)
         torch.cuda.empty_cache()
