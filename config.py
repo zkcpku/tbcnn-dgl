@@ -2,10 +2,10 @@ class myConfig():
     def __init__(self) -> None:
         self.device = 'cuda'
         self.seed = 36
-        self.batch_size = 256
+        self.batch_size = 16
         self.num_workers = 8
 
-        self.model = {'x_size': 256, 'h_size': 256, 'dropout': 0.3, 'num_layers': 1, 'a': 20, 'b': 25, 'routing_iter': 3, 'Dcc': 16}
+        self.model = {'x_size': 256, 'h_size': 256, 'dropout': 0.3, 'num_layers': 1, 'a': 15, 'b': 20, 'routing_iter': 3, 'Dcc': 16}
         # self.model['name'] = 'tbcnn'
         self.model['name'] = 'treecaps'
         
