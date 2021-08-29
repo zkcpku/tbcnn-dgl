@@ -12,7 +12,8 @@ from config import myConfig, my_config
 
 def squash(x, dim=-1):
     squared_norm = (x ** 2).sum(dim=dim, keepdim=True)
-    scale = squared_norm / (1 + squared_norm) / (squared_norm.sqrt() + 1e-8)
+    scale = squared_norm / (1 + squared_norm) / \
+        (torch.sqrt(squared_norm + 1e-8) + 1e-8)
     out = scale * x
     return out 
 
@@ -26,23 +27,22 @@ class TreeCapsClassifier(nn.Module):
         self.layers = nn.ModuleList(TBCNNCell(x_size, h_size)
                                     for _ in range(num_layers))
         self.num_layers = num_layers
-        self.token_embeddings = nn.Embedding(token_vocabsize, x_size//2)
-        self.type_embeddings = nn.Embedding(type_vocabsize, x_size//2)
-        # self.classifier = nn.Linear(h_size, n_classes)
-        self.pooling = GlobalAttentionPooling(nn.Linear(h_size, 1))
+        self.token_embeddings = nn.Embedding(token_vocabsize, int(x_size/2))
+        self.type_embeddings = nn.Embedding(type_vocabsize, x_size - int(x_size/2))
 
         self.Dcc = my_config.model['Dcc']
         self.a = a
         self.b = b
-        # self.N_sc = 100
-        # self.d_sc = 16
-        # self.d_cc = 16
         self.routing_iter = routing_iter
         self.device = device
         self.n_classes = n_classes
-        
-        self.Wjm = nn.Parameter(torch.Tensor(self.a, self.num_layers, self.Dcc * self.n_classes))
-        self.Wjm.data.uniform_(-0.1, 0.1)
+
+        self.Wjm = nn.Parameter(torch.Tensor(
+            self.a, self.num_layers, self.Dcc * self.n_classes), requires_grad=True)
+        self.Wjm.data.normal_(0, 0.01)
+        # self.Wjm.data.uniform_(-0.1, 0.1)
+
+        self.classifier = nn.Linear(self.a * self.num_layers, n_classes)
 
     def forward(self, batch, root_ids=None):
         batch.ndata['h'] = torch.cat([self.type_embeddings(
@@ -80,8 +80,8 @@ class TreeCapsClassifier(nn.Module):
 
         #secondary capsule: Variable-to-Static Routing
         # only used for sorting, sqrt() can be omitted
-        capsule_l2norms = (primary_capsules ** 2).sum(dim=1,
-                                                      keepdim=False).sqrt()
+        # capsule_l2norms = (primary_capsules ** 2).sum(dim=1,
+        #                                               keepdim=False).sqrt()
         # print(capsule_l2norms.size())
         each_pvc = primary_capsules.split(numnodes_feats) 
         u = each_pvc
@@ -107,9 +107,18 @@ class TreeCapsClassifier(nn.Module):
         # size: batch_size * a * m
         # print(out_SC.size())
         # print(out_SC.shape)
+        # print(out_SC)
+
+        # batch_logit = self.classifier(out_SC.view(-1, self.a * self.num_layers))
+        # batch_soft_logit = torch.softmax(batch_logit, dim=-1)
+        # return batch_logit, batch_soft_logit
         
         out_CC = self.dynamic_routing(out_SC)
-        out_CC_l2 = (out_CC ** 2).sum(dim=-1, keepdim=False).sqrt()
+        # print(out_CC.shape)
+        # print(out_CC)
+        out_CC_l2 = (out_CC ** 2).sum(dim=-1, keepdim=False)
+        # print(out_CC_l2)
+        out_CC_l2 = torch.sqrt(out_CC_l2 + 1e-8)
         
 
         # print(out_CC.size())
@@ -122,7 +131,11 @@ class TreeCapsClassifier(nn.Module):
 
     def vts_routing(self, input):
         alpha_IJ = torch.zeros(self.b, self.a).to(self.device)
-        input_l2 = (input ** 2).sum(dim=1, keepdim=False).sqrt()
+        input_l2 = (input ** 2).sum(dim=1, keepdim=False)
+        input_l2 = torch.sqrt(input_l2 + 1e-8)
+        # input_l2 = (input ** 2).sum(dim=1, keepdim=False).sqrt()
+        # print(input_l2.shape)
+        # print(self.b)
         input_l2_topb_loc = input_l2.topk(self.b, dim=-1)[1]
         u_i = input[input_l2_topb_loc]
         u_i = u_i.detach() # ????
@@ -160,8 +173,11 @@ class TreeCapsClassifier(nn.Module):
         # batch_Size * Dcc
         # v_m_j = torch.matmul(input, self.Wjm)
         # print(v_m_j.shape)
+
+        # v_m_j_stopped = v_m_j
         v_m_j_stopped = v_m_j.detach()
         
+
         delta_IJ = torch.zeros(input.shape[0],self.a, self.n_classes).to(self.device)
         for rout in range(self.routing_iter):
             gamma_IJ = torch.softmax(delta_IJ, dim=-1)
@@ -169,6 +185,12 @@ class TreeCapsClassifier(nn.Module):
             # bs * a * n_classes
             # print(v_m_j.shape)
             # bs * a
+            
+            # einsum:
+            # b: batch_size
+            # a: a
+            # n: n_classes
+            # c: Dcc
             if rout == self.routing_iter -1:
                 s_J = torch.einsum('ban,banc->bnc',gamma_IJ, v_m_j)
                 z_m = squash(s_J)
@@ -182,8 +204,11 @@ class TreeCapsClassifier(nn.Module):
                 # batch_size * n_classes
                 # print(v_m_j_stopped.shape)
                 # batch_size * a
-                delta_IJ += torch.einsum('banc,bnc->ban', v_m_j_stopped, z_m)
+                delta_IJ = torch.einsum('banc,bnc->ban', v_m_j_stopped, z_m) + delta_IJ
                 # b * a * n_classes
+                # print(rout)
+                # print(z_m.shape)
+                # print(z_m)
         return z_m
         
 

@@ -5,7 +5,7 @@ class myConfig():
         self.batch_size = 256
         self.num_workers = 8
 
-        self.model = {'x_size': 256, 'h_size': 256, 'dropout': 0.3, 'num_layers': 4, 'a': 20, 'b': 25, 'routing_iter': 3, 'Dcc': 16}
+        self.model = {'x_size': 256, 'h_size': 256, 'dropout': 0.3, 'num_layers': 1, 'a': 20, 'b': 25, 'routing_iter': 3, 'Dcc': 16}
         # self.model['name'] = 'tbcnn'
         self.model['name'] = 'treecaps'
         

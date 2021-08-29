@@ -165,9 +165,9 @@ def main():
 
     scheduler = None
 
-    if os.path.exists(my_config.path['save'] + '/model.pt'):
-        print("loading existing model...")
-        model.load_state_dict(torch.load(my_config.path['save'] + '/model.pt'))    
+    # if os.path.exists(my_config.path['save'] + '/model.pt'):
+    #     print("loading existing model...")
+    #     model.load_state_dict(torch.load(my_config.path['save'] + '/model.pt'))    
 
     checkpoint_last = os.path.join(
         my_config.path['save'], 'checkpoint-last')
@@ -186,8 +186,8 @@ def main():
 
     # loop over the dataset multiple times
     max_acc = 0
-    csv_log = open(my_config.path['save'] + '/acc.log', "w")
-    csv_log.write('Epoch,Accuracy,Loss,\n')
+    
+    
     # torch.autograd.set_detect_anomaly(True)
     for epoch in range(my_config.num_epochs):
         train_iter(train_dataloader, model, criterion, optimizer, scheduler, epoch)
@@ -205,10 +205,13 @@ def main():
             max_acc = acc
             torch.save(model.state_dict(), my_config.path['save'] + '/model.pt')
     print('Finished Training')
-    csv_log.close()
+    
 
 
 
 
 if __name__ == '__main__':
+    csv_log = open(my_config.path['save'] + '/acc.log', "w")
+    csv_log.write('Epoch,Accuracy,Loss,\n')
     main()
+    csv_log.close()
