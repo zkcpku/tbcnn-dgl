@@ -44,10 +44,10 @@ class TreeCapsClassifier(nn.Module):
 
         self.Wjm = nn.Parameter(torch.Tensor(
             self.pvc_caps1_num_caps, self.Dcc ,self.n_classes, self.num_layers), requires_grad=True)
-        self.Wjm.data.normal_(0, 0.01)
-        # self.Wjm.data.uniform_(-0.1, 0.1)
+        # self.Wjm.data.normal_(0, 0.01)
+        self.Wjm.data.uniform_(-0.1, 0.1)
 
-        self.classifier = nn.Linear(self.a * self.num_layers, n_classes)
+        self.classifier = nn.Linear(self.pvc_caps1_num_caps * self.num_layers, n_classes)
 
 
 
@@ -125,9 +125,9 @@ class TreeCapsClassifier(nn.Module):
         # print(out_SC.shape)
         # print(out_SC)
 
-        # batch_logit = self.classifier(out_SC.view(-1, self.a * self.num_layers))
-        # batch_soft_logit = torch.softmax(batch_logit, dim=-1)
-        # return batch_logit, batch_soft_logit
+        batch_logit = self.classifier(out_SC.view(-1, self.pvc_caps1_num_caps * self.num_layers))
+        batch_soft_logit = torch.softmax(batch_logit, dim=-1)
+        return batch_logit, batch_logit
         
         out_CC = self.new_dynamic_routing(out_SC)
         # print(out_CC.shape)

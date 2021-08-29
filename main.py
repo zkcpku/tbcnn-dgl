@@ -201,9 +201,9 @@ def main():
         acc, loss = test_iter(test_dataloader, model, criterion, epoch)
         csv_log.write(str(epoch)+','+str(acc)+','+str(loss)+'\n')
         torch.cuda.empty_cache()
-        if acc > max_acc:
-            max_acc = acc
-            torch.save(model.state_dict(), my_config.path['save'] + '/model.pt')
+        # if acc > max_acc:
+        #     max_acc = acc
+        #     torch.save(model.state_dict(), my_config.path['save'] + '/model.pt')
     print('Finished Training')
     
 
