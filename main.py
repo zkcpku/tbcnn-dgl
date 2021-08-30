@@ -164,10 +164,10 @@ def main():
     #                                             num_training_steps=max_steps)
 
     scheduler = None
-
-    # if os.path.exists(my_config.path['save'] + '/model.pt'):
-    #     print("loading existing model...")
-    #     model.load_state_dict(torch.load(my_config.path['save'] + '/model.pt'))    
+    if my_config.is_load_model:
+        if os.path.exists(my_config.path['save'] + '/model.pt'):
+            print("loading existing model...")
+            model.load_state_dict(torch.load(my_config.path['save'] + '/model.pt'))    
 
     checkpoint_last = os.path.join(
         my_config.path['save'], 'checkpoint-last')
@@ -201,9 +201,10 @@ def main():
         acc, loss = test_iter(test_dataloader, model, criterion, epoch)
         csv_log.write(str(epoch)+','+str(acc)+','+str(loss)+'\n')
         torch.cuda.empty_cache()
-        # if acc > max_acc:
-        #     max_acc = acc
-        #     torch.save(model.state_dict(), my_config.path['save'] + '/model.pt')
+        if my_config.is_save_model:
+            if acc > max_acc:
+                max_acc = acc
+                torch.save(model.state_dict(), my_config.path['save'] + '/model.pt')
     print('Finished Training')
     
 

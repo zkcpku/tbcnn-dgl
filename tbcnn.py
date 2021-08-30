@@ -101,12 +101,14 @@ class TreeCapsClassifier(nn.Module):
         each_pvc = primary_capsules.split(numnodes) 
         u = each_pvc
         # print(len(u)) # batch_size = 8
-        out_SC = []
-        for uu in u:
-            # num_nodes * h_size * num_layers
-            # for each tree-capsule in batch
-            SC = self.new_vts_routing(uu)
-            out_SC.append(SC)
+        # out_SC = []
+        out_SC = self.batch_new_vts_routing(u)
+        # for uu in u:
+        #     # num_nodes * h_size * num_layers
+        #     # for each tree-capsule in batch
+        #     SC = self.new_vts_routing(uu)
+        #     out_SC.append(SC)
+
             # uu_l2 = (uu ** 2).sum(dim=1, keepdim=False).sqrt()
             # print(uu_l2.size())
             # uu_l2_topk_loc = uu_l2.topk(self.a, dim=-1)[1]
@@ -119,7 +121,7 @@ class TreeCapsClassifier(nn.Module):
             # print(vj.shape)
             # # print(vj)
             # alpha = torch.zero(self.a, self.b)
-        out_SC = torch.stack(out_SC, dim=0)
+        # out_SC = torch.stack(out_SC, dim=0)
         # size: batch_size * Npvc * m
         # print(out_SC.size())
         # print(out_SC.shape)
@@ -179,10 +181,49 @@ class TreeCapsClassifier(nn.Module):
                 # print(z_m)
         return z_m
 
+    def batch_new_vts_routing(self, inputs):
+        bs = len(inputs)
+        input_l2_list = [(input.view(input.shape[0], -1)
+                          ** 2).sum(dim=1, keepdim=False) for input in inputs]
+        input_l2_topb_loc_list = [input_l2.topk(self.b, dim=-1)[1] for input_l2 in input_l2_list]
+        u_i = [input[input_l2_topb_loc_list[i]] for i, input in enumerate(inputs)]
+        u_i = torch.stack(u_i, dim=0)
+        # print(u_i.shape)
+        # batch_size * b * h_size * num_layers
+        u_i = u_i.view(u_i.shape[0], self.b * self.h_size, self.num_layers)
+        u_i = u_i.detach()
+
+        print(u_i.shape)
+
+        input_l2_topa_loc_list = [input_l2.topk(self.a, dim=-1)[1] for input_l2 in input_l2_list]
+        v_j = [input[input_l2_topa_loc_list[i]] for i, input in enumerate(inputs)]
+        v_j = torch.stack(v_j, dim=0)
+        # print(v_j.shape)
+        # batch_size * a * h_size * num_layers
+        v_j = v_j.view(v_j.shape[0], self.a * self.h_size, self.num_layers)
+
+        print(v_j.shape)
+
+        alpha_IJ = torch.zeros(bs,int(
+            self.pvc_caps1_num_caps / self.a * self.b), self.pvc_caps1_num_caps).to(self.device)
+        # b: bs
+        # n: pvc_caps1_num_caps
+        # m: pvc_caps1_num_caps / a *b
+        # l: num_layers
+        for rout in range(self.routing_iter):
+            u_produce_v = torch.einsum('bml,bnl->bmn', u_i, v_j)
+            alpha_IJ = u_produce_v + alpha_IJ
+            beta_IJ = torch.softmax(alpha_IJ, dim=-1)
+            v_j = torch.einsum('bmn,bnl->bnl', beta_IJ, v_j)
+        v_j = squash(v_j)
+        return v_j
+
+        # pass
+
     def new_vts_routing(self, input):
         # num_nodes * h_size * num_layers
-        num_outputs = int(self.num_layers * self.h_size / self.num_layers) * self.a
-        alpha_IJ = torch.zeros(int(num_outputs / self.a * self.b), num_outputs).to(self.device)
+        # num_outputs = int(self.num_layers * self.h_size / self.num_layers) * self.a
+        alpha_IJ = torch.zeros(int(self.pvc_caps1_num_caps / self.a * self.b), self.pvc_caps1_num_caps).to(self.device)
         # print(input.shape)
         input_l2 = (input.view(input.shape[0],-1) ** 2).sum(dim=1, keepdim=False)
         # print(input_l2.shape)
