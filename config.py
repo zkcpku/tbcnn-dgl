@@ -2,7 +2,7 @@ class myConfig():
     def __init__(self) -> None:
         self.device = 'cuda'
         self.seed = 36
-        self.batch_size = 256
+        self.batch_size = 32
         self.num_workers = 8
 
         self.model = {'x_size': 256, 'h_size': 256, 'dropout': 0.3, 'num_layers': 4, 'a': 15, 'b': 20, 'routing_iter': 1, 'Dcc': 16}

@@ -181,13 +181,15 @@ def main():
     
     # model.train()
     model.zero_grad()
-    # criterion = nn.CrossEntropyLoss()
-    criterion = nn.MultiMarginLoss()
+
+    # choose loss function
+    criterion = nn.CrossEntropyLoss()
+    # criterion = nn.MultiMarginLoss()
 
     # loop over the dataset multiple times
     max_acc = 0
     
-    
+    # debug gradients
     # torch.autograd.set_detect_anomaly(True)
     for epoch in range(my_config.num_epochs):
         train_iter(train_dataloader, model, criterion, optimizer, scheduler, epoch)

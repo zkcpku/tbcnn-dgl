@@ -129,7 +129,7 @@ class TreeCapsClassifier(nn.Module):
 
         batch_logit = self.classifier(out_SC.view(-1, self.pvc_caps1_num_caps * self.num_layers))
         batch_soft_logit = torch.softmax(batch_logit, dim=-1)
-        return batch_logit, batch_logit
+        return batch_soft_logit, batch_logit
         
         out_CC = self.new_dynamic_routing(out_SC)
         # print(out_CC.shape)
@@ -143,7 +143,7 @@ class TreeCapsClassifier(nn.Module):
         # print(out_CC[0])
         batch_logit = out_CC_l2
         batch_soft_logit = torch.softmax(batch_logit, dim=-1)
-        return batch_logit, batch_logit
+        return batch_soft_logit, batch_logit
 
     def new_dynamic_routing(self, input):
         # n: Npvc
@@ -193,7 +193,7 @@ class TreeCapsClassifier(nn.Module):
         u_i = u_i.view(u_i.shape[0], self.b * self.h_size, self.num_layers)
         u_i = u_i.detach()
 
-        print(u_i.shape)
+        # print(u_i.shape)
 
         input_l2_topa_loc_list = [input_l2.topk(self.a, dim=-1)[1] for input_l2 in input_l2_list]
         v_j = [input[input_l2_topa_loc_list[i]] for i, input in enumerate(inputs)]
@@ -202,7 +202,7 @@ class TreeCapsClassifier(nn.Module):
         # batch_size * a * h_size * num_layers
         v_j = v_j.view(v_j.shape[0], self.a * self.h_size, self.num_layers)
 
-        print(v_j.shape)
+        # print(v_j.shape)
 
         alpha_IJ = torch.zeros(bs,int(
             self.pvc_caps1_num_caps / self.a * self.b), self.pvc_caps1_num_caps).to(self.device)
