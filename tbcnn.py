@@ -9,6 +9,7 @@ from random import randint, choice
 import sys
 from config import myConfig, my_config
 
+
 SQRT_MIN_VALUE = 1e-10
 
 def squash(x, dim=-1):
@@ -183,24 +184,44 @@ class TreeCapsClassifier(nn.Module):
 
     def batch_new_vts_routing(self, inputs):
         bs = len(inputs)
-        input_l2_list = [(input.view(input.shape[0], -1)
-                          ** 2).sum(dim=1, keepdim=False) for input in inputs]
-        input_l2_topb_loc_list = [input_l2.topk(self.b, dim=-1)[1] for input_l2 in input_l2_list]
-        u_i = [input[input_l2_topb_loc_list[i]] for i, input in enumerate(inputs)]
-        u_i = torch.stack(u_i, dim=0)
-        # print(u_i.shape)
-        # batch_size * b * h_size * num_layers
+        inputs_pad = torch.nn.utils.rnn.pad_sequence(inputs, batch_first=True)
+        # batch_size * max_num_nodes * h_size * num_layers
+        input_pad_l2 = (inputs_pad ** 2).sum(dim=-1, keepdim=False).sum(dim=-1, keepdim=False)
+        # print(input_pad_l2.shape)
+        input_l2_topb_loc_list = input_pad_l2.topk(self.b, dim=-1)[1].unsqueeze(-1).unsqueeze(-1).expand(-1, -1, inputs_pad.shape[2], inputs_pad.shape[3])
+        # print(input_l2_topb_loc_list)
+        # print(input_l2_topb_loc_list.shape) # bs * b
+        u_i = inputs_pad.gather(dim=1, index=input_l2_topb_loc_list)
         u_i = u_i.view(u_i.shape[0], self.b * self.h_size, self.num_layers)
         u_i = u_i.detach()
 
-        # print(u_i.shape)
-
-        input_l2_topa_loc_list = [input_l2.topk(self.a, dim=-1)[1] for input_l2 in input_l2_list]
-        v_j = [input[input_l2_topa_loc_list[i]] for i, input in enumerate(inputs)]
-        v_j = torch.stack(v_j, dim=0)
-        # print(v_j.shape)
-        # batch_size * a * h_size * num_layers
+        input_l2_topa_loc_list = input_pad_l2.topk(self.a, dim=-1)[1].unsqueeze(-1).unsqueeze(-1).expand(-1, -1, inputs_pad.shape[2], inputs_pad.shape[3])
+        v_j = inputs_pad.gather(dim=1, index=input_l2_topa_loc_list)
         v_j = v_j.view(v_j.shape[0], self.a * self.h_size, self.num_layers)
+
+        # print(inputs_pad.shape)
+        # print(u_i.shape)
+        # print(input_l2_topb_loc_list)
+        # print(input_l2_topb_loc_list.shape)
+
+        # input_l2_list = [(input.view(input.shape[0], -1)
+        #                   ** 2).sum(dim=1, keepdim=False) for input in inputs]
+        # input_l2_topb_loc_list = [input_l2.topk(self.b, dim=-1)[1] for input_l2 in input_l2_list]
+        # u_i = [input[input_l2_topb_loc_list[i]] for i, input in enumerate(inputs)]
+        # u_i = torch.stack(u_i, dim=0)
+        # # print(u_i.shape)
+        # # batch_size * b * h_size * num_layers
+        # u_i = u_i.view(u_i.shape[0], self.b * self.h_size, self.num_layers)
+        # u_i = u_i.detach()
+
+        # # print(u_i.shape)
+
+        # input_l2_topa_loc_list = [input_l2.topk(self.a, dim=-1)[1] for input_l2 in input_l2_list]
+        # v_j = [input[input_l2_topa_loc_list[i]] for i, input in enumerate(inputs)]
+        # v_j = torch.stack(v_j, dim=0)
+        # # print(v_j.shape)
+        # # batch_size * a * h_size * num_layers
+        # v_j = v_j.view(v_j.shape[0], self.a * self.h_size, self.num_layers)
 
         # print(v_j.shape)
 
