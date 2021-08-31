@@ -19,6 +19,38 @@ from dgl.data.utils import makedirs, save_info, load_info
 from transformers import AdamW, get_linear_schedule_with_warmup
 
 
+
+# class logWriter():
+#     def __init__(self,log_path) -> None:
+#         super().__init__()
+#         self.log_path = log_path
+#         self.log_file = open(self.log_path, 'w')
+
+#     def write(self, data):
+#         self.log_file.write(data)
+#         self.log_file.flush()
+    
+#     def close(self):
+#         self.log_file.close()
+    
+#     def __enter__(self):
+#         return self
+    
+#     def __exit__(self, exc_type, exc_val, exc_tb):
+#         self.close()
+
+#     def __del__(self):
+#         self.close()
+    
+#     def __str__(self):
+#         return self.log_path
+
+def write_log(f, s):
+    # f = open('test.log', 'wb', buffering=0)
+    f.write(str(s).encode('utf8'))
+    # f.close()
+
+
 class CodeNetDataset(DGLDataset):
     def __init__(self,
                 load_path,
@@ -143,9 +175,9 @@ def main():
     test_dataloader = dgl.dataloading.pytorch.GraphDataLoader(
         test_dataset, batch_size=my_config.data['batch_size'], shuffle=False, num_workers=my_config.data['num_workers'])
 
-    dev_dataset = CodeNetDataset(my_config.data['dev_path'])
-    dev_dataloader = dgl.dataloading.pytorch.GraphDataLoader(
-        dev_dataset, batch_size=my_config.data['batch_size'], shuffle=False, num_workers=my_config.data['num_workers'])
+    # dev_dataset = CodeNetDataset(my_config.data['dev_path'])
+    # dev_dataloader = dgl.dataloading.pytorch.GraphDataLoader(
+    #     dev_dataset, batch_size=my_config.data['batch_size'], shuffle=False, num_workers=my_config.data['num_workers'])
 
 
     no_decay = ['bias', 'LayerNorm.weight']
@@ -195,13 +227,13 @@ def main():
         train_iter(train_dataloader, model, criterion, optimizer, scheduler, epoch)
         torch.cuda.empty_cache()
         acc, loss = test_iter(train_dataloader, model, criterion, epoch)
-        csv_log.write(str(epoch)+','+str(acc)+','+str(loss)+'\n')
+        write_log(csv_log,str(epoch)+','+str(acc)+','+str(loss)+'\n')
         torch.cuda.empty_cache()
-        acc, loss = test_iter(dev_dataloader, model, criterion, epoch)
-        csv_log.write(str(epoch)+','+str(acc)+','+str(loss)+'\n')
-        torch.cuda.empty_cache()
+        # acc, loss = test_iter(dev_dataloader, model, criterion, epoch)
+        # write_log(csv_log,str(epoch)+','+str(acc)+','+str(loss)+'\n')
+        # torch.cuda.empty_cache()
         acc, loss = test_iter(test_dataloader, model, criterion, epoch)
-        csv_log.write(str(epoch)+','+str(acc)+','+str(loss)+'\n')
+        write_log(csv_log,str(epoch)+','+str(acc)+','+str(loss)+'\n')
         torch.cuda.empty_cache()
         if my_config.is_save_model:
             if acc > max_acc:
@@ -212,9 +244,8 @@ def main():
 
 
 
-
 if __name__ == '__main__':
-    csv_log = open(my_config.path['save'] + '/acc.log', "w")
-    csv_log.write('Epoch,Accuracy,Loss,\n')
+    csv_log = open(my_config.path['save'] + '/acc.log', "wb", buffering=0)
+    write_log(csv_log,'Epoch,Accuracy,Loss,\n')
     main()
     csv_log.close()

@@ -9,8 +9,8 @@ class myConfig():
         # self.model['name'] = 'tbcnn'
         self.model['name'] = 'treecaps'
 
-        self.is_save_model = False
-        self.is_load_model = False
+        self.is_save_model = True
+        self.is_load_model = True
         
         self.task_name = 'java'
         if self.task_name == 'java':
@@ -29,7 +29,7 @@ class myConfig():
             self.task = {'vocab_size': (61, 100), 'num_classes': 800, 'task': 'python800'}
             self.data = {'train_path': '/home/zhangkechi/workspace/dgl_tbcnn/data/Project_CodeNet_Python800_spts/train.pkl',
                         'test_path': '/home/zhangkechi/workspace/dgl_tbcnn/data/Project_CodeNet_Python800_spts/test.pkl',
-                        'dev_path': '/home/zhangkechi/workspace/dgl_tbcnn/data/Project_CodeNet_Python800_spts/dev.pkl',
+                         'dev_path': '/home/zhangkechi/workspace/dgl_tbcnn/data/Project_CodeNet_Python800_spts/dev.pkl',
                         'batch_size': self.batch_size,
                         'num_workers': self.num_workers}
             self.path = {
